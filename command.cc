@@ -285,9 +285,119 @@ void Command::print()
 void Command::execute()
 {
     print();
-    /*
-        Write your code here
-    */
+
+    if (_numberOfSimpleCommands == 0)
+    {
+        clear();
+        return;
+    }
+
+    int defaultin = dup(STDIN_FILENO);
+    int defaultout = dup(STDOUT_FILENO);
+    int defaulterr = dup(STDERR_FILENO);
+
+    int inputfd = defaultin;
+    int outputfd = defaultout;
+    int errorfd = defaulterr;
+
+    if (_inputFile)
+    {
+        inputfd = open(_inputFile, O_RDONLY);
+        if (inputfd < 0)
+        {
+            perror("open input");
+            close(defaultin);
+            close(defaultout);
+            close(defaulterr);
+            return;
+        }
+    }
+
+    if (_outFile)
+    {
+        int flags = O_WRONLY | O_CREAT | (_append ? O_APPEND : O_TRUNC);
+        outputfd = open(_outFile, flags, 0666);
+        if (outputfd < 0)
+        {
+            perror("open output");
+            if (inputfd != defaultin) close(inputfd);
+            close(defaultin);
+            close(defaultout);
+            close(defaulterr);
+            return;
+        }
+    }
+
+    if (_errFile)
+    {
+        int flags = O_WRONLY | O_CREAT | (_append ? O_APPEND : O_TRUNC);
+        errorfd = open(_errFile, flags, 0666);
+        if (errorfd < 0)
+        {
+            perror("open error");
+            if (inputfd != defaultin) close(inputfd);
+            if (outputfd != defaultout) close(outputfd);
+            close(defaultin);
+            close(defaultout);
+            close(defaulterr);
+            return;
+        }
+    }
+
+    for (int i = 0; i < _numberOfSimpleCommands; i++)
+    {
+        SimpleCommand *simple = _simpleCommands[i];
+        if (simple == NULL || simple->_numberOfArguments == 0)
+        {
+            continue;
+        }
+
+        pid_t pid = fork();
+        if (pid == -1)
+        {
+            perror("fork");
+            break;
+        }
+        else if (pid == 0)
+        {
+            if (i == 0 && _inputFile)
+            {
+                dup2(inputfd, STDIN_FILENO);
+                close(inputfd);
+            }
+
+            if (i == _numberOfSimpleCommands - 1 && _outFile)
+            {
+                dup2(outputfd, STDOUT_FILENO);
+                close(outputfd);
+            }
+
+            if (i == _numberOfSimpleCommands - 1 && _errFile)
+            {
+                dup2(errorfd, STDERR_FILENO);
+                close(errorfd);
+            }
+
+            execvp(simple->_arguments[0], simple->_arguments);
+            perror(simple->_arguments[0]);
+            _exit(1);
+        }
+
+        int status = 0;
+        waitpid(pid, &status, 0);
+    }
+
+    dup2(defaultin, STDIN_FILENO);
+    dup2(defaultout, STDOUT_FILENO);
+    dup2(defaulterr, STDERR_FILENO);
+
+    close(defaultin);
+    close(defaultout);
+    close(defaulterr);
+
+    if (inputfd != defaultin) close(inputfd);
+    if (outputfd != defaultout) close(outputfd);
+    if (errorfd != defaulterr) close(errorfd);
 
     clear();
 }

@@ -66,7 +66,7 @@ std::vector<Token> tokenize(const std::string &input)
 }
 
 
-/*std::vector<Token> tokenize(const std::string &input)
+/* std::vector<Token> tokenize(const std::string &input)
 {
     std::vector<Token> tokens;
 
@@ -212,4 +212,4 @@ std::vector<Token> tokenize(const std::string &input)
     tokens.push_back({TOKEN_EOF, ""});
 
     return tokens;
-}
+}*/

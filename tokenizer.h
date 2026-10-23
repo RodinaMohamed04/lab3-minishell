@@ -16,7 +16,7 @@ enum TokenType
     TOKEN_PIPE,       
     TOKEN_BACKGROUND, 
     TOKEN_REDIRECT_AND_ERROR,
-    TOKEN_EOF,       
+    TOKEN_EOF
 };
 
 struct Token
