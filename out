@@ -1,0 +1,26 @@
+total 124
+drwxrwxr-x 3 rodina-mohamed rodina-mohamed  4096 Oct 24 11:35 .
+drwxrwxr-x 3 rodina-mohamed rodina-mohamed  4096 Oct 23 13:52 ..
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed 15894 Oct 24 11:21 command.cc
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   775 Oct 23 13:52 command.h
+drwxrwxr-x 8 rodina-mohamed rodina-mohamed  4096 Oct 24 11:13 .git
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed     6 Oct 24 11:29 input.txt
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   389 Oct 24 11:13 Makefile
+-rwxrwxr-x 1 rodina-mohamed rodina-mohamed 68016 Oct 24 11:21 myshell
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed     0 Oct 24 11:35 out
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed     9 Oct 24 11:28 output.txt
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed  6400 Oct 23 20:34 tokenizer.cc
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   448 Oct 23 20:34 tokenizer.h
+total 128
+drwxrwxr-x 3 rodina-mohamed rodina-mohamed  4096 Oct 24 11:35 .
+drwxrwxr-x 3 rodina-mohamed rodina-mohamed  4096 Oct 23 13:52 ..
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed 15894 Oct 24 11:21 command.cc
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   775 Oct 23 13:52 command.h
+drwxrwxr-x 8 rodina-mohamed rodina-mohamed  4096 Oct 24 11:13 .git
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed     6 Oct 24 11:29 input.txt
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   389 Oct 24 11:13 Makefile
+-rwxrwxr-x 1 rodina-mohamed rodina-mohamed 68016 Oct 24 11:21 myshell
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   852 Oct 24 11:35 out
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed     9 Oct 24 11:28 output.txt
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed  6400 Oct 23 20:34 tokenizer.cc
+-rw-rw-r-- 1 rodina-mohamed rodina-mohamed   448 Oct 23 20:34 tokenizer.h

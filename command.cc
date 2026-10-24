@@ -27,7 +27,7 @@
 #include <sstream>
 #include "command.h"
 #include "tokenizer.h"
-
+#include <array>
 
 void parse(std::vector<Token> &tokens)
 {
@@ -72,7 +72,7 @@ void parse(std::vector<Token> &tokens)
         // Remove the closing quote
         argument.pop_back();
         }
-        currentSimpleCommand->insertArgument(strdup(tokens[i].value.c_str()));
+        currentSimpleCommand->insertArgument(strdup(argument.c_str()));
         }
 
         // Pipe |
