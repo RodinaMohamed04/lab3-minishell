@@ -30,7 +30,7 @@
 #include <array>
 
 void childHandler(int signalNumber){
-    //(void)signalNumber;
+    (void)signalNumber;
 
     //int savedErrno = errno;
     int status;
@@ -45,7 +45,6 @@ void childHandler(int signalNumber){
             close(fd);
         }
     }
-
     //errno = savedErrno;
 }
 
@@ -560,12 +559,16 @@ void Command::execute()
 // first 
 void Command::prompt()
 {
-    printf("myshell>");
-    fflush(stdout);
     std::string input;
-    while (true)
-    {
-        std::getline(std::cin, input); 
+
+    while (true){
+        printf("myshell>");
+        fflush(stdout);
+
+        if (!std::getline(std::cin, input)){
+            break;
+        }
+
         std::vector<Token> tokens = tokenize(input);
         parse(tokens);
     }

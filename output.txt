@@ -1,1 +1,11 @@
+command.cc
+command.h
 Makefile
+myshell
+myshell.log
+out
+out2
+output.txt
+tokenizer.cc
+tokenizer.h
+second
