@@ -29,23 +29,30 @@
 #include "tokenizer.h"
 #include <array>
 
-void childHandler(int signalNumber){
+void logChildEnded()
+{
+    const char message[] = "Child ended\n";
+
+    int fd = open("myshell.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
+
+    if (fd != -1) {
+        write(fd, message, sizeof(message) - 1);
+        close(fd);
+    }
+}
+
+void childHandler(int signalNumber)
+{
     (void)signalNumber;
 
-    //int savedErrno = errno;
+    int savedErrno = errno;
     int status;
 
-    while (waitpid(-1, &status, WNOHANG) > 0){
-        const char message[] = "Child ended\n";
-
-        int fd = open("myshell.log",O_WRONLY | O_CREAT | O_APPEND,0666);
-
-        if (fd != -1){
-            write(fd, message, sizeof(message) - 1);
-            close(fd);
-        }
+    while (waitpid(-1, &status, WNOHANG) > 0) {
+        logChildEnded();
     }
-    //errno = savedErrno;
+
+    errno = savedErrno;
 }
 
 
@@ -538,16 +545,19 @@ void Command::execute()
     }
 
     // Wait for foreground commands only
-    if (!_background){
-        for (pid_t child : pids){
-            while (waitpid(child, NULL, 0) == -1){
-                if (errno == EINTR){
-                    continue;
-                }
-                if (errno != ECHILD){
-                    perror("waitpid");
-                }
-                break;
+    if (!_background) {
+        for (pid_t child : pids) {
+            pid_t result;
+
+            do {
+                result = waitpid(child, NULL, 0);
+            } while (result == -1 && errno == EINTR);
+
+            if (result == child) {
+                logChildEnded();
+            }
+            else if (result == -1 && errno != ECHILD) {
+                perror("waitpid");
             }
         }
     }
