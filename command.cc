@@ -29,6 +29,27 @@
 #include "tokenizer.h"
 #include <array>
 
+void childHandler(int signalNumber){
+    //(void)signalNumber;
+
+    //int savedErrno = errno;
+    int status;
+
+    while (waitpid(-1, &status, WNOHANG) > 0){
+        const char message[] = "Child ended\n";
+
+        int fd = open("myshell.log",O_WRONLY | O_CREAT | O_APPEND,0666);
+
+        if (fd != -1){
+            write(fd, message, sizeof(message) - 1);
+            close(fd);
+        }
+    }
+
+    //errno = savedErrno;
+}
+
+
 void parse(std::vector<Token> &tokens)
 {
     Command currentCommand;
@@ -325,7 +346,7 @@ void Command::execute()
         char **args = _simpleCommands[0]->_arguments;
 
         if (strcmp(args[0], "exit") == 0){
-            printf("Exit\n");
+            printf("Good bye!!\n");
             clear();
             exit(0);
         }
@@ -393,6 +414,8 @@ void Command::execute()
         }
 
         if (pid == 0){
+            signal(SIGINT, SIG_DFL);
+            signal(SIGCHLD, SIG_DFL);
             if (i > 0){
                 if (dup2(pipes[i - 1][0], STDIN_FILENO) == -1){
                     perror("dup2 input pipe");
@@ -553,6 +576,12 @@ SimpleCommand *Command::_currentSimpleCommand;
 
 int main()
 {
+    signal(SIGINT, SIG_IGN);
+
+    if (signal(SIGCHLD, childHandler) == SIG_ERR) {
+        perror("signal");
+        return 1;
+    }
     Command::_currentCommand.prompt();
     return 0;
 }
