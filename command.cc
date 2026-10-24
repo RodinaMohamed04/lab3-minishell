@@ -45,7 +45,34 @@ void parse(std::vector<Token> &tokens)
 
         // Normal command or argument
         if (tokens[i].type == TOKEN_COMMAND || tokens[i].type == TOKEN_ARGUMENT){
-            currentSimpleCommand->insertArgument(strdup(tokens[i].value.c_str()));
+             std::string argument = tokens[i].value;
+
+        // Check if the argument starts with a double quote
+        if (!argument.empty() && argument[0] == '"'){
+        // Remove the opening quote
+        argument.erase(0, 1);
+
+        // Keep collecting tokens until we find the closing quote
+        while (argument.empty() || argument.back() != '"'){
+            if (i + 1 >= (int)tokens.size() || tokens[i + 1].type == TOKEN_EOF){
+                fprintf(stderr, "syntax error: unmatched double quote\n");
+                errorFlag = true;
+                break;
+            }
+
+            i++;
+            argument += " ";
+            argument += tokens[i].value;
+        }
+
+        if (errorFlag){
+            break;
+        }
+
+        // Remove the closing quote
+        argument.pop_back();
+        }
+        currentSimpleCommand->insertArgument(strdup(tokens[i].value.c_str()));
         }
 
         // Pipe |
@@ -282,125 +309,231 @@ void Command::print()
     printf("\n\n");
 }
 
+
 void Command::execute()
 {
     print();
 
-    if (_numberOfSimpleCommands == 0)
-    {
+    //first check if there exist any invaid commands
+    if (_numberOfSimpleCommands == 0 || _simpleCommands[0] == NULL || _simpleCommands[0]->_arguments[0] == NULL){
         clear();
         return;
     }
 
-    int defaultin = dup(STDIN_FILENO);
-    int defaultout = dup(STDOUT_FILENO);
-    int defaulterr = dup(STDERR_FILENO);
+    //handeling build-in functions 
+    if (_numberOfSimpleCommands == 1) {
+        char **args = _simpleCommands[0]->_arguments;
 
-    int inputfd = defaultin;
-    int outputfd = defaultout;
-    int errorfd = defaulterr;
+        if (strcmp(args[0], "exit") == 0){
+            printf("Exit\n");
+            clear();
+            exit(0);
+        }
 
-    if (_inputFile)
-    {
-        inputfd = open(_inputFile, O_RDONLY);
-        if (inputfd < 0)
-        {
-            perror("open input");
-            close(defaultin);
-            close(defaultout);
-            close(defaulterr);
+        if (strcmp(args[0], "cd") == 0){
+            const char *path = args[1];
+
+            if (path == NULL){
+                path = getenv("HOME");
+            }
+
+            if (path == NULL){
+                fprintf(stderr, "cd: HOME is not set\n");
+            }
+            else if (chdir(path) == -1){
+                perror("cd");
+            }
+
+            clear();
             return;
         }
     }
 
-    if (_outFile)
-    {
-        int flags = O_WRONLY | O_CREAT | (_append ? O_APPEND : O_TRUNC);
-        outputfd = open(_outFile, flags, 0666);
-        if (outputfd < 0)
-        {
-            perror("open output");
-            if (inputfd != defaultin) close(inputfd);
-            close(defaultin);
-            close(defaultout);
-            close(defaulterr);
+    //creating pipes 
+    int num = _numberOfSimpleCommands;
+    std::vector<std::array<int, 2>> pipes(num > 1 ? num - 1 : 0);
+
+    for (int i = 0; i < num - 1; i++){
+        if (pipe(pipes[i].data()) == -1){
+            perror("pipe");
+
+            for (int j = 0; j < i; j++){
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            clear();
             return;
         }
     }
 
-    if (_errFile)
-    {
-        int flags = O_WRONLY | O_CREAT | (_append ? O_APPEND : O_TRUNC);
-        errorfd = open(_errFile, flags, 0666);
-        if (errorfd < 0)
-        {
-            perror("open error");
-            if (inputfd != defaultin) close(inputfd);
-            if (outputfd != defaultout) close(outputfd);
-            close(defaultin);
-            close(defaultout);
-            close(defaulterr);
-            return;
-        }
-    }
+    //create child for each pipe
+    std::vector<pid_t> pids;
 
-    for (int i = 0; i < _numberOfSimpleCommands; i++)
-    {
-        SimpleCommand *simple = _simpleCommands[i];
-        if (simple == NULL || simple->_numberOfArguments == 0)
-        {
-            continue;
-        }
-
+    for (int i = 0; i < num; i++){
         pid_t pid = fork();
-        if (pid == -1)
-        {
+
+        if (pid == -1){
             perror("fork");
-            break;
-        }
-        else if (pid == 0)
-        {
-            if (i == 0 && _inputFile)
-            {
-                dup2(inputfd, STDIN_FILENO);
-                close(inputfd);
+
+            // Close the parent's pipe descriptors
+            for (int j = 0; j < num - 1; j++){
+                close(pipes[j][0]); // read
+                close(pipes[j][1]); // write
             }
 
-            if (i == _numberOfSimpleCommands - 1 && _outFile)
-            {
-                dup2(outputfd, STDOUT_FILENO);
-                close(outputfd);
+            // Wait for children that were already created
+            for (pid_t child : pids){
+                while (waitpid(child, NULL, 0) == -1 && errno == EINTR){
+                }
             }
 
-            if (i == _numberOfSimpleCommands - 1 && _errFile)
-            {
-                dup2(errorfd, STDERR_FILENO);
-                close(errorfd);
-            }
-
-            execvp(simple->_arguments[0], simple->_arguments);
-            perror(simple->_arguments[0]);
-            _exit(1);
+            clear();
+            return;
         }
 
-        int status = 0;
-        waitpid(pid, &status, 0);
+        if (pid == 0){
+            if (i > 0){
+                if (dup2(pipes[i - 1][0], STDIN_FILENO) == -1){
+                    perror("dup2 input pipe");
+                    _exit(1);
+                }
+            }
+            //Connect output to the next pipe
+            if (i < num - 1){
+                if (dup2(pipes[i][1], STDOUT_FILENO) == -1){
+                    perror("dup2 output pipe");
+                    _exit(1);
+                }
+            }
+            // Close all original pipe descriptors in this child
+            for (int j = 0; j < num - 1; j++){
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            //Input redirection: < file
+            // Applied to the first command
+            if (i == 0 && _inputFile != NULL){
+                int fd = open(_inputFile, O_RDONLY);
+
+                if (fd == -1){
+                    perror(_inputFile);
+                    _exit(1);
+                }
+
+                if (dup2(fd, STDIN_FILENO) == -1){
+                    perror("dup2 input file");
+                    close(fd);
+                    _exit(1);
+                }
+
+                close(fd);
+            }
+
+            //Output and error redirection
+            // Applied to the last command
+            if (i == num - 1){
+                // >>& file : append both stdout and stderr
+                if (_out_error && _outFile != NULL){
+                    int fd = open(_outFile,O_WRONLY | O_CREAT | O_APPEND,0666);
+
+                    if (fd == -1){
+                        perror(_outFile);
+                        _exit(1);
+                    }
+
+                    if (dup2(fd, STDOUT_FILENO) == -1 || dup2(fd, STDERR_FILENO) == -1){
+                        perror("dup2 output and error");
+                        close(fd);
+                        _exit(1);
+                    }
+
+                    close(fd);
+                }
+                else{
+                    // > file or >> file
+                    if (_outFile != NULL){
+                        int flags = O_WRONLY | O_CREAT;
+
+                        if (_append){
+                            flags |= O_APPEND;
+                        }
+                        else{
+                            flags |= O_TRUNC;
+                        }
+
+                        int fd = open(_outFile, flags, 0666);
+
+                        if (fd == -1){
+                            perror(_outFile);
+                            _exit(1);
+                        }
+
+                        if (dup2(fd, STDOUT_FILENO) == -1){
+                            perror("dup2 output file");
+                            close(fd);
+                            _exit(1);
+                        }
+
+                        close(fd);
+                    }
+
+                    // 2> file
+                    if (_errFile != NULL){
+                        int fd = open(_errFile,O_WRONLY | O_CREAT | O_TRUNC,0666);
+
+                        if (fd == -1){
+                            perror(_errFile);
+                            _exit(1);
+                        }
+
+                        if (dup2(fd, STDERR_FILENO) == -1){
+                            perror("dup2 error file");
+                            close(fd);
+                            _exit(1);
+                        }
+
+                        close(fd);
+                    }
+                }
+            }
+
+            //Execute this simple command
+            execvp(_simpleCommands[i]->_arguments[0],_simpleCommands[i]->_arguments);
+
+            //if execvp fails
+            perror(_simpleCommands[i]->_arguments[0]);
+            _exit(127);
+        }
+        // PARENT PROCESS: save the child's PID
+        pids.push_back(pid);
+    }
+    //Parent closes its copies of all pipe descriptors
+    for (int i = 0; i < num - 1; i++){
+        close(pipes[i][0]);
+        close(pipes[i][1]);
     }
 
-    dup2(defaultin, STDIN_FILENO);
-    dup2(defaultout, STDOUT_FILENO);
-    dup2(defaulterr, STDERR_FILENO);
-
-    close(defaultin);
-    close(defaultout);
-    close(defaulterr);
-
-    if (inputfd != defaultin) close(inputfd);
-    if (outputfd != defaultout) close(outputfd);
-    if (errorfd != defaulterr) close(errorfd);
-
+    // Wait for foreground commands only
+    if (!_background){
+        for (pid_t child : pids){
+            while (waitpid(child, NULL, 0) == -1){
+                if (errno == EINTR){
+                    continue;
+                }
+                if (errno != ECHILD){
+                    perror("waitpid");
+                }
+                break;
+            }
+        }
+    }
+    //Free the command table
     clear();
 }
+
+
 // first 
 void Command::prompt()
 {
